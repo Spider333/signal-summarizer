@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log File Viewer</title>
+  <style>
+    /* Solarized Dark Color Palette */
+    :root {
+      --base03: #002b36;
+      --base02: #073642;
+      --base01: #586e75;
+      --base00: #657b83;
+      --base0: #839496;
+      --base1: #93a1a1;
+      --base2: #eee8d5;
+      --base3: #fdf6e3;
+
+      --yellow: #b58900;
+      --orange: #cb4b16;
+      --red: #dc322f;
+      --magenta: #d33682;
+      --violet: #6c71c4;
+      --blue: #268bd2;
+      --cyan: #2aa198;
+      --green: #859900;
+    }
+
+    body {
+      font-family: monospace;
+      background: var(--base03);
+      color: var(--base0);
+      padding: 1em;
+      margin: 0;
+      overflow-y: scroll;
+      overflow-x: hidden; /* Prevents horizontal scroll */
+    }
+
+    #log-container {
+      white-space: pre-wrap; /* Allows line wrapping */
+      word-break: break-word; /* Breaks long words */
+    }
+
+    .log-line {
+      padding: 2px;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      white-space: pre-wrap; /* Ensures child elements also wrap */
+      word-break: break-word; /* Ensures child elements break words */
+    }
+
+    .error {
+      background: var(--red);
+      color: var(--base3) !important; /* Light text on red background */
+      font-weight: bold;
+    }
+
+    .prompt {
+      background: var(--blue);
+      color: var(--base3) !important; /* Light text on blue background */
+    }
+
+    .response {
+      background: var(--green);
+      color: var(--base03) !important; /* Dark text on green background */
+    }
+
+    .highlight {
+      outline: 2px solid var(--yellow);
+    }
+
+    /* Override ANSI color styles within specific log types */
+    .error span,
+    .prompt span,
+    .response span {
+      color: inherit !important;
+    }
+
+    /* Overlay Styles */
+    #overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 43, 54, 0.95); /* Semi-transparent background */
+      color: var(--base3);
+      display: none; /* Hidden by default */
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      z-index: 1000;
+      padding: 2em;
+      box-sizing: border-box;
+    }
+
+    #overlayContent {
+      background-color: var(--base02);
+      padding: 2em;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+    }
+
+    #overlayContent h2 {
+      margin-top: 0;
+      color: var(--yellow);
+    }
+
+    #overlayContent ul {
+      list-style-type: none;
+      padding: 0;
+    }
+
+    #overlayContent li {
+      margin: 0.5em 0;
+    }
+
+    #overlayContent li span.key {
+      display: inline-block;
+      width: 30px;
+      font-weight: bold;
+      color: var(--cyan);
+    }
+
+    /* Responsive Adjustments */
+    @media (max-width: 600px) {
+      #overlayContent {
+        padding: 1em;
+      }
+
+      #overlayContent li span.key {
+        width: 25px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <pre id="log-container" aria-label="Log File Viewer"></pre>
+
+  <!-- Overlay for Keyboard Shortcuts -->
+  <div id="overlay">
+    <div id="overlayContent">
+      <h2>Keyboard Shortcuts</h2>
+      <ul>
+        <li><span class="key">j</span> or <span class="key">↓</span>: Navigate down</li>
+        <li><span class="key">k</span> or <span class="key">↑</span>: Navigate up</li>
+        <li><span class="key">h</span> or <span class="key">←</span>: Skip to previous prompt, response, or error</li>
+        <li><span class="key">l</span> or <span class="key">→</span>: Skip to next prompt, response, or error</li>
+        <li><span class="key">H</span>: Skip to previous response</li>
+        <li><span class="key">L</span>: Skip to next response</li>
+        <li><span class="key">z</span>: Skip to previous error</li>
+        <li><span class="key">x</span>: Skip to next error</li>
+        <li><span class="key">?</span>: Show/hide this help overlay</li>
+      </ul>
+      <p>Press any key to dismiss.</p>
+    </div>
+  </div>
+
+  <script>
+    const logContainer = document.getElementById('log-container');
+    const overlay = document.getElementById('overlay');
+
+    // Terminal color regex mapping to CSS
+    const colorMap = {
+      '\\[31m': 'color: var(--red);',        // Red
+      '\\[32m': 'color: var(--green);',      // Green
+      '\\[33m': 'color: var(--yellow);',     // Yellow
+      '\\[34m': 'color: var(--blue);',       // Blue
+      '\\[35m': 'color: var(--magenta);',    // Magenta
+      '\\[36m': 'color: var(--cyan);',       // Cyan
+      '\\[37m': 'color: var(--base0);',      // White
+      '\\[0m': 'color: inherit;',            // Reset to inherit
+    };
+
+    let logLines = [];
+    let currentIndex = 0;
+
+    // Function to sanitize filename
+    function sanitizeFilename(filename) {
+      const regex = /^[a-zA-Z0-9_.-]+$/;
+      return regex.test(filename) ? filename : null;
+    }
+
+    // Function to get filename from GET parameters
+    function getFilename() {
+      const params = new URLSearchParams(window.location.search);
+      const filename = params.get('filename');
+      if (filename) {
+        const sanitized = sanitizeFilename(filename);
+        if (sanitized) {
+          return sanitized;
+        } else {
+          console.warn('Invalid filename parameter. Falling back to output.log');
+        }
+      }
+      return 'output.log'; // Default filename
+    }
+
+    const logFilename = getFilename();
+
+    // Updated Timestamp regex to account for optional leading ANSI escape codes (case-insensitive)
+    const timestampRegex = /^(?:\x1b\[[0-9;]*m)?\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}/i;
+
+    // Load log file content
+    async function loadLogFile() {
+      try {
+        const response = await fetch(logFilename);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const text = await response.text();
+        parseLogFile(text);
+      } catch (error) {
+        console.error('Error loading the log file:', error);
+        logContainer.textContent = `Error loading the log file: ${error.message}`;
+      }
+    }
+
+    function parseLogFile(text) {
+      logLines = []; // Clear previous entries
+      const lines = text.split('\n');
+      let currentEntry = null;
+
+      lines.forEach((line, index) => {
+        // Replace ANSI codes with <span> elements
+        let styledLine = line;
+        for (const [code, style] of Object.entries(colorMap)) {
+          const regex = new RegExp(code, 'g');
+          styledLine = styledLine.replace(regex, `<span style="${style}">`);
+        }
+        styledLine = styledLine.replace(/\[0m/g, '</span>');
+
+        // Determine the type based on content (case-insensitive)
+        let type = null;
+        if (/ERROR/i.test(line) || /^Traceback/i.test(line)) {
+          type = 'error';
+        } else if (/Full prompt sent to LLM|Sending prompt to LLM:/i.test(line)) {
+          type = 'prompt';
+        } else if (/Received structured output|Received response from LLM:/i.test(line)) {
+          type = 'response';
+        }
+
+        // Check if the line starts a new log entry
+        if (timestampRegex.test(line)) {
+          // Push the previous entry if exists
+          if (currentEntry) {
+            logLines.push(currentEntry);
+          }
+          // Start a new entry
+          currentEntry = { line: styledLine, index, type, element: null };
+        } else if (currentEntry) {
+          // Append to the current entry if it's a continuation
+          // Additionally, if the line contains 'Traceback', mark the entry as 'error'
+          if (/^Traceback/i.test(line)) {
+            currentEntry.type = 'error';
+            // Remove any existing color span to prevent conflicts
+            currentEntry.line = currentEntry.line.replace('<span style="color: var(--base0);">', '');
+            currentEntry.line = `<span style="color: inherit;">${currentEntry.line}`;
+          }
+          currentEntry.line += `\n${styledLine}`;
+        } else {
+          // Handle lines that don't start with a timestamp
+          console.warn(`Line ${index + 1} does not start with a timestamp and will be ignored.`);
+        }
+      });
+
+      // Push the last entry if exists
+      if (currentEntry) {
+        logLines.push(currentEntry);
+      }
+
+      console.log(`Parsed ${logLines.length} log entries.`);
+      renderLog();
+    }
+
+    function renderLog() {
+      logContainer.innerHTML = '';
+      logLines.forEach((entry, index) => {
+        const div = document.createElement('div');
+        div.className = 'log-line';
+        if (entry.type) div.classList.add(entry.type);
+        div.innerHTML = entry.line;
+        div.dataset.index = index;
+        entry.element = div;
+        logContainer.appendChild(div);
+      });
+      highlightCurrent();
+    }
+
+    function highlightCurrent() {
+      document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+      const currentElement = logLines[currentIndex]?.element;
+      if (currentElement) {
+        currentElement.classList.add('highlight');
+        currentElement.scrollIntoView({ block: 'center' });
+      }
+    }
+
+    function navigate(direction) {
+      if (direction === 'up' && currentIndex > 0) currentIndex--;
+      if (direction === 'down' && currentIndex < logLines.length - 1) currentIndex++;
+      highlightCurrent();
+    }
+
+    function skipTo(type, forward = true) {
+      const increment = forward ? 1 : -1;
+      let newIndex = currentIndex + increment;
+
+      while (newIndex >= 0 && newIndex < logLines.length) {
+        if (logLines[newIndex]?.type === type) {
+          currentIndex = newIndex;
+          highlightCurrent();
+          return;
+        }
+        newIndex += increment;
+      }
+    }
+
+    function skipAcrossTypes(types, forward = true) {
+      const increment = forward ? 1 : -1;
+      let newIndex = currentIndex + increment;
+
+      while (newIndex >= 0 && newIndex < logLines.length) {
+        if (types.includes(logLines[newIndex]?.type)) {
+          currentIndex = newIndex;
+          highlightCurrent();
+          return;
+        }
+        newIndex += increment;
+      }
+    }
+
+    // Function to toggle overlay visibility
+    function toggleOverlay() {
+      if (overlay.style.display === 'flex') {
+        overlay.style.display = 'none';
+      } else {
+        overlay.style.display = 'flex';
+      }
+    }
+
+    document.addEventListener('keydown', (event) => {
+      const key = event.key;
+
+      switch (key) {
+        case 'ArrowUp':
+        case 'j':
+          navigate('up');
+          event.preventDefault();
+          break;
+        case 'ArrowDown':
+        case 'k':
+          navigate('down');
+          event.preventDefault();
+          break;
+        case 'ArrowLeft':
+        case 'h':
+          skipAcrossTypes(['prompt', 'response', 'error'], false);
+          event.preventDefault();
+          break;
+        case 'ArrowRight':
+        case 'l':
+          skipAcrossTypes(['prompt', 'response', 'error'], true);
+          event.preventDefault();
+          break;
+        case 'H':
+          skipTo('response', false);
+          event.preventDefault();
+          break;
+        case 'L':
+          skipTo('response', true);
+          event.preventDefault();
+          break;
+        case 'z':
+          skipTo('error', false);
+          event.preventDefault();
+          break;
+        case 'x':
+          skipTo('error', true);
+          event.preventDefault();
+          break;
+        case '?':
+          toggleOverlay();
+          event.preventDefault();
+          break;
+        default:
+          // If overlay is visible, any key press will hide it
+          if (overlay.style.display === 'flex') {
+            toggleOverlay();
+            event.preventDefault();
+          }
+          break;
+      }
+    });
+
+    // Initial load
+    loadLogFile();
+  </script>
+</body>
+</html>

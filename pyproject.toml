@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "signal-summarizer"
+version = "0.1.0"
+description = "A summarizer of signal groups."
+authors = ["Juraj Bednar <juraj@bednar.io>"]
+license = "MIT"
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.13"
+pywhispercpp = "^1.2.0"
+ollama = "^0.3.3"
+langchain = "^0.3.7"
+langchain-community = "^0.3.5"
+beautifulsoup4 = "^4.12.3"
+requests = "^2.32.3"
+youtube-transcript-api = "^0.6.2"
+pytube = "^15.0.0"
+pydantic = "^2.9.2"
+langchain-ollama = "^0.2.0"
+colorlog = "^6.9.0"
+langchain-unstructured = "^0.1.5"
+unstructured = {extras = ["local"], version = "^0.16.5"}
+langchain-openai = "^0.2.9"
+yt-dlp = "^2024.11.18"
+scikit-learn = "^1.6.0"
+
+[tool.poetry.scripts]
+summarize_signal_group = "summarize_signal_group:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
