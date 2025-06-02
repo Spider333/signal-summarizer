@@ -767,14 +767,16 @@ def summarize_group(config, args, group_id, llm_dict, vision_util, stt_model, re
     else:
         messages = fetch_messages(database, group_id, since, until)
         group_resume_data['messages'] = messages
-        save_resume_file(resume_file, resume_data)
+        if resume_file:  # Only save if resume file is provided
+            save_resume_file(resume_file, resume_data)
 
     if not messages:
         print(f"No messages found for group {group_id} in the specified date range.")
         # Remove group from resume data if present
         if group_id in resume_data.get('groups', {}):
             del resume_data['groups'][group_id]
-            save_resume_file(resume_file, resume_data)
+            if resume_file:  # Only save if resume file is provided
+                save_resume_file(resume_file, resume_data)
         return
 
     # Process attachments (images and audio)
@@ -783,7 +785,8 @@ def summarize_group(config, args, group_id, llm_dict, vision_util, stt_model, re
     else:
         process_attachments(messages, group_config, args.regenerate_attachment_descriptions, database, attachment_root, vision_util, stt_model)
         group_resume_data['attachments_processed'] = True
-        save_resume_file(resume_file, resume_data)
+        if resume_file:  # Only save if resume file is provided
+            save_resume_file(resume_file, resume_data)
 
     # Build prompts for summarization
     if 'conversation_chunks' in group_resume_data and not args.redo_themes:
@@ -792,7 +795,8 @@ def summarize_group(config, args, group_id, llm_dict, vision_util, stt_model, re
     else:
         conversation_chunks = build_conversation_chunks(messages, group_config, llm_dict)
         group_resume_data['conversation_chunks'] = conversation_chunks
-        save_resume_file(resume_file, resume_data)
+        if resume_file:  # Only save if resume file is provided
+            save_resume_file(resume_file, resume_data)
 
     # Initialize LLMs for themes, recombination, translation
     themes_model_name = group_config.get('themes', {}).get('model')
@@ -813,7 +817,8 @@ def summarize_group(config, args, group_id, llm_dict, vision_util, stt_model, re
     else:
         process_links(messages, group_config, args.regenerate_link_summaries, database, group_id, link_summarizer_llm)
         group_resume_data['links_processed'] = True
-        save_resume_file(resume_file, resume_data)
+        if resume_file:  # Only save if resume file is provided
+            save_resume_file(resume_file, resume_data)
 
     # Generate summaries (themes) per chunk
     if 'themes' in group_resume_data and not args.redo_themes:
@@ -829,7 +834,8 @@ def summarize_group(config, args, group_id, llm_dict, vision_util, stt_model, re
         # Convert to serializable format
         summaries_dicts = [t.dict() for t in summaries]
         group_resume_data['themes'] = summaries_dicts
-        save_resume_file(resume_file, resume_data)
+        if resume_file:  # Only save if resume file is provided
+            save_resume_file(resume_file, resume_data)
 
     # Recombine summaries
     if 'final_themes' in group_resume_data and not args.redo_merging:
@@ -841,7 +847,8 @@ def summarize_group(config, args, group_id, llm_dict, vision_util, stt_model, re
         # Convert to serializable format
         final_themes_dict = final_themes.dict() if final_themes else {}
         group_resume_data['final_themes'] = final_themes_dict
-        save_resume_file(resume_file, resume_data)
+        if resume_file:  # Only save if resume file is provided
+            save_resume_file(resume_file, resume_data)
 
     # Build final summary from themes
     if 'final_summary' in group_resume_data and not args.redo_merging:
@@ -850,7 +857,8 @@ def summarize_group(config, args, group_id, llm_dict, vision_util, stt_model, re
     else:
         final_summary = build_summary_from_themes(final_themes, group_config, database, group_id, since, until)
         group_resume_data['final_summary'] = final_summary
-        save_resume_file(resume_file, resume_data)
+        if resume_file:  # Only save if resume file is provided
+            save_resume_file(resume_file, resume_data)
 
     # Write the pre-translation summary to output_file_orig
     with open(output_file_orig, 'w', encoding='utf-8') as f:
@@ -868,7 +876,8 @@ def summarize_group(config, args, group_id, llm_dict, vision_util, stt_model, re
             else:
                 translated_summary = translation_llm.translate_text(final_summary, target_language, translation_prompt, max_chunk_size)
                 group_resume_data['translated_summary'] = translated_summary
-                save_resume_file(resume_file, resume_data)
+                if resume_file:  # Only save if resume file is provided
+                    save_resume_file(resume_file, resume_data)
             final_summary = translated_summary
             logging.info(f"Translated summary to {target_language}.")
         except Exception as e:
@@ -887,7 +896,8 @@ def summarize_group(config, args, group_id, llm_dict, vision_util, stt_model, re
     if 'groups' in resume_data:
         if group_id in resume_data['groups']:
             del resume_data['groups'][group_id]
-            save_resume_file(resume_file, resume_data)
+            if resume_file:  # Only save if resume file is provided
+                save_resume_file(resume_file, resume_data)
 
 def capitalize_theme_name(name):
     return name[0].upper() + name[1:] # not using .capitalize() because we don't want to touch capitalization of other letters
