@@ -54,27 +54,11 @@ const ALLOWED_GROUPS = {
     summaryFile: 'summary_ai_feytopia.md',
     displayName: 'AI x FEYTOPIA'
   },
-  'alltime feytopia community': {
-    summaryFile: 'summary_alltime_feytopia.md',
-    displayName: 'ALLTIME FEYTOPIA COMMUNITY'
-  },
-  'civilisational resilience': {
-    summaryFile: 'summary_civilisational_resilience.md',
-    displayName: 'Civilisational Resilience'
-  },
-  'dvadsaťjeden edukácia': {
-    summaryFile: 'summary_21_edukacia.md',
-    displayName: 'Dvadsaťjeden Edukácia'
-  },
-  'panzerschokolade': {
-    summaryFile: 'summary_panzerschokolade.md',
-    displayName: 'Panzerschokolade'
-  },
   'paraguaj on-site in asuncion': {
     summaryFile: 'summary_paraguaj_onsite.md',
     displayName: 'Paraguaj on-site in Asuncion'
   },
-  // Legacy imported groups (only used if no live version exists)
+  // Additional groups
   'bitcoin kyc&tax sk/cz chat': {
     summaryFile: 'summary_bitcoin_kyc_tax.md',
     displayName: 'Bitcoin KYC & Tax SK/CZ'
