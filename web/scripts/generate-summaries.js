@@ -37,7 +37,7 @@ try {
 // Map group IDs to their summary files and display names
 // Groups are matched by name (case-insensitive) if ID not found
 const ALLOWED_GROUPS = {
-  // Your requested groups (will be populated by live collector)
+  // Live collector groups (preferred over imported)
   'paraguajskí fešáci': {
     summaryFile: 'summary_paraguajski_fesaci.md',
     displayName: 'Paraguajskí fešáci'
@@ -50,6 +50,31 @@ const ALLOWED_GROUPS = {
     summaryFile: 'summary_global_opportunists.md',
     displayName: 'Global Opportunists'
   },
+  'ai x feytopia': {
+    summaryFile: 'summary_ai_feytopia.md',
+    displayName: 'AI x FEYTOPIA'
+  },
+  'alltime feytopia community': {
+    summaryFile: 'summary_alltime_feytopia.md',
+    displayName: 'ALLTIME FEYTOPIA COMMUNITY'
+  },
+  'civilisational resilience': {
+    summaryFile: 'summary_civilisational_resilience.md',
+    displayName: 'Civilisational Resilience'
+  },
+  'dvadsaťjeden edukácia': {
+    summaryFile: 'summary_21_edukacia.md',
+    displayName: 'Dvadsaťjeden Edukácia'
+  },
+  'panzerschokolade': {
+    summaryFile: 'summary_panzerschokolade.md',
+    displayName: 'Panzerschokolade'
+  },
+  'paraguaj on-site in asuncion': {
+    summaryFile: 'summary_paraguaj_onsite.md',
+    displayName: 'Paraguaj on-site in Asuncion'
+  },
+  // Legacy imported groups (only used if no live version exists)
   'bitcoin kyc&tax sk/cz chat': {
     summaryFile: 'summary_bitcoin_kyc_tax.md',
     displayName: 'Bitcoin KYC & Tax SK/CZ'
@@ -66,19 +91,10 @@ const ALLOWED_GROUPS = {
     summaryFile: 'summary_liberation_travel.md',
     displayName: 'Liberation Travel Announcements'
   },
-  // Additional groups with existing data
-  'imported_AIxFEYTOPIA': {
-    summaryFile: 'summary_ai_feytopia.md',
-    displayName: 'AI x FEYTOPIA'
-  },
-  'aixfeytopia': {
-    summaryFile: 'summary_ai_feytopia.md',
-    displayName: 'AI x FEYTOPIA'
-  },
 }
 
 // Get all groups with message counts - only include explicitly allowed groups
-const groups = db.prepare(`
+const allGroups = db.prepare(`
   SELECT
     groupId as id,
     groupName as name,
@@ -94,6 +110,39 @@ const groups = db.prepare(`
   const nameLower = (g.name || '').toLowerCase()
   return g.id in ALLOWED_GROUPS || nameLower in ALLOWED_GROUPS
 })
+
+// Deduplicate groups: prefer live collector groups over imported ones
+// When multiple groups have the same display name, keep only the most recent one
+const groupsByName = new Map()
+allGroups.forEach(g => {
+  const nameLower = (g.name || '').toLowerCase()
+  const allowedConfig = ALLOWED_GROUPS[g.id] || ALLOWED_GROUPS[nameLower] || {}
+  const displayName = (allowedConfig.displayName || g.name || '').toLowerCase()
+
+  const existing = groupsByName.get(displayName)
+  if (!existing) {
+    groupsByName.set(displayName, g)
+  } else {
+    // Prefer non-imported groups (live collector data)
+    const existingIsImported = existing.id.startsWith('imported_')
+    const currentIsImported = g.id.startsWith('imported_')
+
+    if (existingIsImported && !currentIsImported) {
+      // Replace imported with live
+      console.log(`Preferring live group "${g.name}" over imported "${existing.name}"`)
+      groupsByName.set(displayName, g)
+    } else if (!existingIsImported && currentIsImported) {
+      // Keep live, skip imported
+      console.log(`Skipping imported group "${g.name}" (live version exists: "${existing.name}")`)
+    } else if (g.lastTimestamp > existing.lastTimestamp) {
+      // Same type, prefer more recent
+      console.log(`Preferring more recent group "${g.name}" over "${existing.name}"`)
+      groupsByName.set(displayName, g)
+    }
+  }
+})
+
+const groups = Array.from(groupsByName.values()).sort((a, b) => b.lastTimestamp - a.lastTimestamp)
 
 // Scan for all existing summary files in the parent directory
 const summaryDir = path.join(__dirname, '..', '..')
