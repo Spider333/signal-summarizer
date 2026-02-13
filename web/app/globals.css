@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.prose {
+  max-width: none;
+}
+
+.prose h1 {
+  @apply text-2xl font-bold mt-6 mb-4 text-gray-900;
+}
+
+.prose h2 {
+  @apply text-xl font-semibold mt-5 mb-3 text-gray-800;
+}
+
+.prose h3 {
+  @apply text-lg font-medium mt-4 mb-2 text-gray-700;
+}
+
+.prose p {
+  @apply my-3 text-gray-600 leading-relaxed;
+}
+
+.prose ul {
+  @apply list-disc list-inside my-3 space-y-1;
+}
+
+.prose ol {
+  @apply list-decimal list-inside my-3 space-y-1;
+}
+
+.prose li {
+  @apply text-gray-600;
+}
+
+.prose a {
+  @apply text-blue-600 hover:text-blue-800 underline;
+}
+
+.prose code {
+  @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.prose pre {
+  @apply bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-gray-300 pl-4 italic text-gray-600 my-4;
+}
+
+/* Scroll offset for anchor links */
+.scroll-mt-20 {
+  scroll-margin-top: 5rem;
+}
+
+/* Highlight animation when jumping to section */
+@keyframes highlight {
+  0% { background-color: rgb(254 249 195); }
+  100% { background-color: transparent; }
+}
+
+.prose h2:target,
+.prose h3:target {
+  animation: highlight 2s ease-out;
+}
