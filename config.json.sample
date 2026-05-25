@@ -38,6 +38,21 @@
         "provider": "ollama",
         "endpoint": "http://127.0.0.1:11434",
         "model": "llama3.3:70b"
+      },
+      "claude-3-5-sonnet": {
+        "provider": "anthropic",
+        "model": "claude-3-5-sonnet-20241022",
+        "apiKey": ""
+      },
+      "claude-3-5-haiku": {
+        "provider": "anthropic",
+        "model": "claude-3-5-haiku-20241022",
+        "apiKey": ""
+      },
+      "claude-3-opus": {
+        "provider": "anthropic",
+        "model": "claude-3-opus-20240229",
+        "apiKey": ""
       }
     },
     "themes": {

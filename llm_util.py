@@ -61,6 +61,16 @@ class LLMUtil:
                 api_key=model_config.get('apiKey'),
                 base_url=model_config.get('apiBase')
             )
+        elif self.provider == 'anthropic':
+            from langchain_anthropic import ChatAnthropic
+            import os
+            api_key = model_config.get('apiKey') or os.environ.get('ANTHROPIC_API_KEY')
+            kwargs = {'model': model_config['model']}
+            if api_key:
+                kwargs['api_key'] = api_key
+            if model_config.get('apiBase'):
+                kwargs['base_url'] = model_config.get('apiBase')
+            self.llm = ChatAnthropic(**kwargs)
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
 

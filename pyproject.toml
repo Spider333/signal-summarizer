@@ -23,6 +23,7 @@ colorlog = "^6.9.0"
 langchain-unstructured = "^0.1.5"
 unstructured = {extras = ["local"], version = "^0.16.5"}
 langchain-openai = "^0.2.9"
+langchain-anthropic = "^0.2.4"
 yt-dlp = "^2024.11.18"
 scikit-learn = "^1.6.0"
 
