@@ -14,7 +14,10 @@ secrets/
 
 # Generated files
 poetry.lock
+.venv/
 summary*.md
+sync-messages.sh
+config-optionplus-venice-e2ee.json.orig
 outputs/*
 run.sh
 run*.sh
@@ -44,6 +47,7 @@ venv/
 # IDE
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 

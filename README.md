@@ -8,16 +8,16 @@ It can use fully local models. For understanding images, it uses multimodal mode
 
 For voice recongition (voice messages), it uses whisper and then LLM.
 
-It generates topics from LLMs, downloads webpages to describe them, then uses embedding clusters 
+It generates topics from LLMs, downloads webpages to describe them, then uses embedding clusters
 to detect similar themes, merge them (we can be way beyond context window and even when we're not,
 long texts would usually not work due to problems with keeping attention on many topics at the
 same time).
 
-It also uses the LLM for the final translation step. It will understand topics in any language, 
+It also uses the LLM for the final translation step. It will understand topics in any language,
 but it will internally generate English text, which it can then translate back to a specified
 language.
 
-The app can resume operation if stopped. 
+The app can resume operation if stopped.
 
 Use [signal-message-processor](https://github.com/jooray/signal-message-processor) to collect the
 messages, it can be run on a different computer than the one that does the summaries.
@@ -28,8 +28,8 @@ locally.
 ### But also does not work super well...
 
 If you have improvements of the algorithm, or even the prompts, let me know. The problem with this
-approach is it is extremely sensitive to error - either generating too many topics that are too 
-similar, or grouping many unrelated themes to a few grand themes ("Geopolitic" or 
+approach is it is extremely sensitive to error - either generating too many topics that are too
+similar, or grouping many unrelated themes to a few grand themes ("Geopolitic" or
 "cryptocurrency").
 
 ## Features
@@ -46,8 +46,10 @@ similar, or grouping many unrelated themes to a few grand themes ("Geopolitic" o
 - **Handles Large Prompts**: Splits and recombines messages for efficient processing using LangChain's text splitter.
 - **Modular Design**: Utilizes separate components for LLM interactions, vision processing, and speech-to-text.
 - **Resume Functionality**: Supports resuming the summarization process from the last successful step using a resume file.
+- **Sliding Window Theme Extraction**: Can carry recent themes across chunks and decide whether each new chunk updates an existing theme or introduces a new one.
 - **Customizable Similarity Threshold**: Allows configuration of the similarity threshold for merging themes during recombination.
 - **Embedding-Based Clustering**: Optionally group themes first with embeddings + clustering before verifying with the existing similarity prompt (reduces the number of LLM calls).
+- **Cluster Refinement**: Can split oversized clusters, enforce pairwise cohesion, and run a final cross-cluster merge pass.
 - **Selective Redo Options**: Provides command-line options to redo specific parts of the summarization process.
 
 ## Requirements
@@ -67,14 +69,48 @@ similar, or grouping many unrelated themes to a few grand themes ("Geopolitic" o
 
 ## Installation
 
-**Install dependencies using Poetry:**
+1. **Clone the repository:**
 
    ```bash
-   pip install poetry
+   git clone https://github.com/jooray/signal-summarizer.git
+   cd signal-summarizer
+   ```
+
+2. **Install dependencies using [uv](https://docs.astral.sh/uv/) (recommended):**
+
+   ```bash
+   # Install uv if you don't have it
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # Create the virtual environment and install all dependencies from uv.lock
+   uv sync
+   ```
+
+   `uv sync` will read `pyproject.toml` and `uv.lock`, pick a matching
+   Python interpreter (installing one via `uv python install` if needed),
+   and create a local `.venv/`. Run any command inside the environment
+   with `uv run`, for example `uv run python ./summarize_signal_group.py`.
+
+   To add a new dependency later use `uv add <package>` (this updates
+   `pyproject.toml` and `uv.lock` together).
+
+   <details>
+   <summary><strong>Using Poetry instead</strong></summary>
+
+   Poetry 2.0+ understands the standards-compliant `pyproject.toml`
+   shipped in this repo and can be used as an alternative:
+
+   ```bash
+   pip install "poetry>=2.0"
    poetry install
    ```
 
-**Configure the tool:**
+   Caveat: only `uv.lock` is committed. Poetry will resolve dependencies
+   fresh and may pick slightly different versions than `uv.lock` — use uv
+   if you need reproducible installs.
+   </details>
+
+3. **Configure the tool:**
 
    - Copy `config.json.sample` to `config.json` and adjust settings as needed.
 
@@ -89,7 +125,7 @@ similar, or grouping many unrelated themes to a few grand themes ("Geopolitic" o
 #### List Available Groups
 
 ```bash
-poetry run summarize_signal_group --list-groups
+uv run python ./summarize_signal_group.py --list-groups
 ```
 
 #### Generate Summary for Specific Group(s)
@@ -97,7 +133,7 @@ poetry run summarize_signal_group --list-groups
 To generate a summary for specific group(s), use:
 
 ```bash
-poetry run summarize_signal_group --group GROUP_ID1 GROUP_ID2
+uv run python ./summarize_signal_group.py --group GROUP_ID1 GROUP_ID2
 ```
 
 If no `--group` is specified, the script will summarize all groups defined in the `config.json`.
@@ -105,25 +141,25 @@ If no `--group` is specified, the script will summarize all groups defined in th
 #### Specify Output File
 
 ```bash
-poetry run summarize_signal_group --group GROUP_ID --output summary.md
+uv run python ./summarize_signal_group.py --group GROUP_ID --output summary.md
 ```
 
 #### Specify Date Range
 
 ```bash
-poetry run summarize_signal_group --group GROUP_ID --since YYYY-MM-DD --until YYYY-MM-DD
+uv run python ./summarize_signal_group.py --group GROUP_ID --since YYYY-MM-DD --until YYYY-MM-DD
 ```
 
 #### Summarize Last Week or Month
 
 ```bash
-poetry run summarize_signal_group --group GROUP_ID --last-week
+uv run python ./summarize_signal_group.py --group GROUP_ID --last-week
 ```
 
 or
 
 ```bash
-poetry run summarize_signal_group --group GROUP_ID --last-month
+uv run python ./summarize_signal_group.py --group GROUP_ID --last-month
 ```
 
 #### Regenerate Attachment Descriptions
@@ -131,7 +167,7 @@ poetry run summarize_signal_group --group GROUP_ID --last-month
 If you want to force regeneration of attachment descriptions (e.g., image descriptions, audio transcriptions), use:
 
 ```bash
-poetry run summarize_signal_group --group GROUP_ID --regenerate-attachment-descriptions
+uv run python ./summarize_signal_group.py --group GROUP_ID --regenerate-attachment-descriptions
 ```
 
 #### Regenerate Link Summaries
@@ -139,7 +175,7 @@ poetry run summarize_signal_group --group GROUP_ID --regenerate-attachment-descr
 If you want to force regeneration of link summaries, use:
 
 ```bash
-poetry run summarize_signal_group --group GROUP_ID --regenerate-link-summaries
+uv run python ./summarize_signal_group.py --group GROUP_ID --regenerate-link-summaries
 ```
 
 #### Redo Specific Steps
@@ -149,19 +185,19 @@ To redo specific parts of the summarization process even if they are present in 
 - **Redo Themes Generation** (implies `--redo-merging`):
 
   ```bash
-  poetry run summarize_signal_group --group GROUP_ID --redo-themes
+  uv run python ./summarize_signal_group.py --group GROUP_ID --redo-themes
   ```
 
 - **Redo Merging of Themes**:
 
   ```bash
-  poetry run summarize_signal_group --group GROUP_ID --redo-merging
+  uv run python ./summarize_signal_group.py --group GROUP_ID --redo-merging
   ```
 
 - **Redo Link Processing**:
 
   ```bash
-  poetry run summarize_signal_group --group GROUP_ID --redo-links
+  uv run python ./summarize_signal_group.py --group GROUP_ID --redo-links
   ```
 
 #### Keep Resume File After Successful Processing
@@ -169,7 +205,7 @@ To redo specific parts of the summarization process even if they are present in 
 By default, the resume file is deleted after successful processing. To keep the resume file, use:
 
 ```bash
-poetry run summarize_signal_group --group GROUP_ID --keep-resume-file
+uv run python ./summarize_signal_group.py --group GROUP_ID --keep-resume-file
 ```
 
 #### Resuming from a Previous Run
@@ -181,7 +217,7 @@ If you are processing large groups or expect the summarization process to take a
 Specify a path for the resume file using the `--resume-file` command-line argument. The summarizer will save its progress to this file after each major step. If the summarizer is interrupted, you can rerun the command with the same resume file to continue from where it left off.
 
 ```bash
-poetry run summarize_signal_group --group GROUP_ID --resume-file resume.json
+uv run python ./summarize_signal_group.py --group GROUP_ID --resume-file resume.json
 ```
 
 ##### Resume File Configuration
@@ -208,9 +244,15 @@ You can also specify a default resume file in the `config.json` under the `"resu
 
 Optionally, you can enable an **embedding-based clustering** step to reduce the number of LLM calls and better group similar themes before verifying them with the existing similarity prompt.
 
-1. In `config.json`, set `"embedding_clustering.enabled": true` and configure the `"model"`, `"eps"`, and `"min_samples"` parameters.
-2. During the summarization process, the tool will use DBSCAN on the theme embeddings to form initial clusters.  
-3. Only themes *within* each cluster will then be processed via the typical similarity_prompt-based merging.
+The tool supports three clustering algorithms for grouping similar themes:
+
+| Algorithm | Best For | Tuning Required |
+|-----------|----------|-----------------|
+| **HDBSCAN** (default) | General use | None |
+| **DBSCAN** | Known density | Yes (`eps`) |
+| **Louvain** | Large datasets | Minimal |
+
+**Recommendation**: Use HDBSCAN (default) - it automatically handles varying density without parameter tuning and produces better semantic groupings.
 
 Example `config.json` snippet:
 
@@ -218,10 +260,49 @@ Example `config.json` snippet:
 "embedding_clustering": {
   "enabled": true,
   "model": "mxbai-embed-large",
-  "eps": 0.3,
-  "min_samples": 2
+  "method": "hdbscan",
+  "min_cluster_size": 2,
+  "hdbscan_min_samples": 2,
+  "max_cluster_size": 20,
+  "refine_similarity_threshold": 0.75,
+  "refine_resolution": 1.35,
+  "cohesion": {
+    "high_rating_min": 0.30,
+    "high_rating_avg": 0.40,
+    "low_rating_min": 0.40,
+    "low_rating_avg": 0.50
+  },
+  "cross_cluster_merge": true
 }
 ```
+
+Example `themes` snippet with sliding window enabled:
+
+```json
+"themes": {
+  "model": "local-llama",
+  "max_chunk_size": 9000,
+  "sliding_window": {
+    "enabled": true,
+    "window_size": 5,
+    "prompt": "..."
+  }
+}
+```
+
+#### Algorithm-Specific Parameters
+
+**HDBSCAN** (recommended):
+- `min_cluster_size`: 2-3 for small datasets, 3-5 for large
+- `hdbscan_min_samples`: 1 for sensitivity, 2 for stricter
+
+**DBSCAN**:
+- `eps`: 0.2-0.5 (requires tuning per dataset)
+- `min_samples`: typically 2
+
+**Louvain**:
+- `similarity_threshold`: 0.4-0.6 (higher = tighter clusters)
+- `resolution`: <1.0 fewer clusters, >1.0 more clusters
 
 ## Configuration
 
@@ -237,9 +318,10 @@ The tool is configured via a `config.json` file. You can specify defaults and ov
 - **database**: Path to the SQLite database containing messages.
 - **attachment_root**: Path to the directory containing attachments.
 - **output_file**: Default output file for summaries.
+- **output_file_orig**: Optional file for the English or pre-translation summary.
 - **language**: The language to ensure in the summaries.
 - **resume_file**: Path to the resume file for saving progress (optional).
-- **embedding_clustering**: (Optional) Settings for embedding-based DBSCAN clustering of themes.
+- **embedding_clustering**: (Optional) Settings for embedding-based clustering of themes (supports HDBSCAN, DBSCAN, and Louvain methods).
 
 ### Configuration Breakdown
 
@@ -257,10 +339,26 @@ The tool is configured via a `config.json` file. You can specify defaults and ov
     Only themes with a similarity rating equal to or above the `similarity_threshold` will be merged.
 
 - **embedding_clustering**:
-  - **enabled**: If set to true, the tool will first cluster extracted themes with an embedding model and DBSCAN.
+  - **enabled**: If set to true, the tool will first cluster extracted themes with an embedding model.
   - **model**: The Ollama embedding model used for obtaining embeddings.
-  - **eps**: The maximum distance between two samples for them to be considered in the same neighborhood by DBSCAN.
-  - **min_samples**: The minimum number of samples in a neighborhood for a point to be considered a core point.
+  - **method**: Clustering algorithm to use: `hdbscan` (default), `dbscan`, or `louvain`.
+  - **min_cluster_size**: (HDBSCAN) Minimum cluster size (default: 2).
+  - **hdbscan_min_samples**: (HDBSCAN) Minimum samples for core points (default: 1).
+  - **max_cluster_size**: Maximum cluster size before the tool tries to split an oversized cluster.
+  - **refine_similarity_threshold**: Similarity threshold used during oversized-cluster refinement.
+  - **refine_resolution**: Louvain resolution used during oversized-cluster refinement.
+  - **cohesion**: Pairwise embedding thresholds used to reject weak similarity groups before merging.
+  - **cross_cluster_merge**: Runs a final merge pass across themes that survived the initial cluster boundaries.
+  - **eps**: (DBSCAN) Maximum distance between samples in the same neighborhood.
+  - **min_samples**: (DBSCAN) Minimum samples for a core point.
+  - **similarity_threshold**: (Louvain) Minimum similarity for edge creation (default: 0.5).
+  - **resolution**: (Louvain) Resolution parameter for community detection (default: 1.0).
+
+- **themes**:
+  - **prompt**: Theme extraction prompt for each chunk.
+  - **sliding_window.enabled**: Enables incremental theme extraction across neighboring chunks.
+  - **sliding_window.window_size**: Number of recent themes to expose to the next chunk.
+  - **sliding_window.prompt**: Prompt used when the model decides whether to update or create themes.
 
 - **models**: Define all LLM models you intend to use, specifying their providers (`ollama`, `venice`, or `openai`), endpoints, and necessary credentials.
 
