@@ -1,7 +1,7 @@
 # File: llm_util.py
 
 import logging
-from typing import List, Optional, Type, Any
+from typing import List, Literal, Optional, Type, Any, Union
 
 from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
 from langchain.prompts import PromptTemplate
@@ -13,21 +13,52 @@ import time
 class LinkSummary(BaseModel):
     title: Optional[str] = Field(description="The title of the webpage")
     summary: Optional[str] = Field(description="A concise summary of the webpage")
-    error: Optional[str] = Field(description="Error message if any occurred during summarization")
+    error: Optional[str] = Field(
+        description="Error message if any occurred during summarization"
+    )
 
 
 class ConversationTheme(BaseModel):
     name: str = Field(description="Name of the theme")
     summary: str = Field(description="Summary of the discussion on this theme")
-    dissenting_opinions: Optional[str] = Field(description="Optional dissenting opinions on the topic")
+    dissenting_opinions: Optional[str] = Field(
+        description="Optional dissenting opinions on the topic"
+    )
 
 
 class ConversationThemes(BaseModel):
     themes: List[ConversationTheme] = Field(description="List of themes discussed")
 
 
+class ThemeAction(BaseModel):
+    action: str = Field(
+        description="Either 'update' to update an existing theme, or 'new' to create a new theme"
+    )
+    theme_id: Optional[int] = Field(
+        default=None,
+        description="The number of the existing theme to update (required when action is 'update')",
+    )
+    name: str = Field(
+        description="Theme name (updated name for 'update', new name for 'new')"
+    )
+    summary: str = Field(
+        description="Theme summary (updated summary for 'update', new summary for 'new')"
+    )
+    dissenting_opinions: Optional[str] = Field(
+        default="", description="Optional dissenting opinions on the topic"
+    )
+
+
+class ThemeActions(BaseModel):
+    themes: List[ThemeAction] = Field(
+        description="List of theme actions (updates and new themes)"
+    )
+
+
 class SimilarityGroup(BaseModel):
-    theme_numbers: List[int] = Field(description="List of theme numbers that are similar")
+    theme_numbers: List[int] = Field(
+        description="List of theme numbers that are similar"
+    )
     similarity_rating: float = Field(description="Similarity rating for the group")
 
 
@@ -38,29 +69,50 @@ class SimilarityGroups(BaseModel):
 class LLMUtil:
     def __init__(self, model_config):
         self.model_config = model_config
-        self.provider = model_config.get('provider', 'ollama')
-        self.logger = logging.getLogger('llm_util')
+        self.provider = model_config.get("provider", "ollama")
+        self.logger = logging.getLogger("llm_util")
 
-        if self.provider == 'ollama':
+        # Timeout in seconds for LLM requests (default 10 minutes)
+        self.request_timeout = model_config.get("request_timeout", 600)
+
+        if self.provider == "ollama":
             from langchain_ollama import ChatOllama
+
             self.llm = ChatOllama(
-                base_url=model_config.get('endpoint', 'http://localhost:11434'),
-                model=model_config['model']
+                base_url=model_config.get("endpoint", "http://localhost:11434"),
+                model=model_config["model"],
+                client_kwargs={"timeout": self.request_timeout},
             )
-        elif self.provider == 'openai':
+        elif self.provider == "openai":
             from langchain_openai import ChatOpenAI
+
             self.llm = ChatOpenAI(
-                model=model_config['model'],
-                api_key=model_config.get('apiKey'),
-                base_url=model_config.get('apiBase')
+                model=model_config["model"],
+                api_key=model_config.get("apiKey"),
+                base_url=model_config.get("apiBase"),
+                request_timeout=self.request_timeout,
+                max_retries=3,
             )
-        elif self.provider == 'venice':
+        elif self.provider == "venice":
             from chat_venice_api import ChatVeniceAPI
+
             self.llm = ChatVeniceAPI(
-                model=model_config['model'],
-                api_key=model_config.get('apiKey'),
-                base_url=model_config.get('apiBase')
+                model=model_config["model"],
+                api_key=model_config.get("apiKey"),
+                base_url=model_config.get("apiBase"),
+                request_timeout=self.request_timeout,
+                max_retries=3,
             )
+        elif self.provider == 'anthropic':
+            from langchain_anthropic import ChatAnthropic
+            import os
+            api_key = model_config.get('apiKey') or os.environ.get('ANTHROPIC_API_KEY')
+            kwargs = {'model': model_config['model']}
+            if api_key:
+                kwargs['api_key'] = api_key
+            if model_config.get('apiBase'):
+                kwargs['base_url'] = model_config.get('apiBase')
+            self.llm = ChatAnthropic(**kwargs)
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
@@ -73,7 +125,7 @@ class LLMUtil:
             try:
                 self.logger.debug(f"Sending prompt to LLM:\n{prompt}")
                 response = self.llm.invoke(prompt)
-                response = getattr(response, 'content', str(response))
+                response = getattr(response, "content", str(response))
                 self.logger.debug(f"Received response from LLM:\n{response}")
                 return response
             except Exception as e:
@@ -83,8 +135,12 @@ class LLMUtil:
                     time.sleep(wait_time)
                     wait_time *= 2
                 else:
-                    self.logger.error(f"LLM API request failed after {max_retries} attempts: {e}")
-                    raise Exception(f"LLM API request failed after {max_retries} attempts: {str(e)}")
+                    self.logger.error(
+                        f"LLM API request failed after {max_retries} attempts: {e}"
+                    )
+                    raise Exception(
+                        f"LLM API request failed after {max_retries} attempts: {str(e)}"
+                    )
 
     def split_text(self, text: str, max_chunk_size: int) -> List[str]:
         """Split text into manageable chunks for processing."""
@@ -104,9 +160,15 @@ class LLMUtil:
         context: str,
         pydantic_class: Type[BaseModel],
         max_retries: int = 3,
+        network_retries: int = 5,
         **kwargs,
     ) -> BaseModel:
-        """Generate structured output using a Pydantic model with OutputFixingParser."""
+        """Generate structured output using a Pydantic model with OutputFixingParser.
+
+        Args:
+            max_retries: Retries for output parsing failures.
+            network_retries: Retries for network/timeout failures with exponential backoff.
+        """
         # Initialize the Pydantic parser
         pydantic_parser = PydanticOutputParser(pydantic_object=pydantic_class)
 
@@ -136,17 +198,56 @@ class LLMUtil:
             max_retries=max_retries,
         )
 
-        try:
-            # Use OutputFixingParser to parse and fix the output if necessary
-            result = output_fixer.parse(full_prompt)
-            self.logger.debug(f"Received structured output:\n{result}")
-            return result
-        except Exception as e:
-            self.logger.error(f"Failed to generate valid output: {e}")
-            raise
+        wait_time = 3
+        for attempt in range(network_retries):
+            try:
+                # Use OutputFixingParser to parse and fix the output if necessary
+                result = output_fixer.parse(full_prompt)
+                self.logger.debug(f"Received structured output:\n{result}")
+                return result
+            except Exception as e:
+                error_str = str(e)
+                # Distinguish parsing errors (which OutputFixingParser already retried)
+                # from network/timeout errors (which need our retry loop)
+                is_network_error = any(
+                    keyword in error_str.lower()
+                    for keyword in [
+                        "timeout",
+                        "timed out",
+                        "connection",
+                        "connect",
+                        "refused",
+                        "reset",
+                        "broken pipe",
+                        "eof",
+                        "httpx",
+                        "network",
+                        "unreachable",
+                        "500",
+                        "502",
+                        "503",
+                        "504",
+                        "429",
+                        "rate limit",
+                    ]
+                )
+                if is_network_error and attempt < network_retries - 1:
+                    self.logger.warning(
+                        f"Structured output attempt {attempt + 1} failed with network error: {e}. "
+                        f"Retrying in {wait_time}s..."
+                    )
+                    time.sleep(wait_time)
+                    wait_time *= 2
+                else:
+                    self.logger.error(f"Failed to generate valid output: {e}")
+                    raise
 
     def summarize_link(
-        self, context: str, prompt_template: str, max_title_length: int, max_summary_length: int
+        self,
+        context: str,
+        prompt_template: str,
+        max_title_length: int,
+        max_summary_length: int,
     ) -> LinkSummary:
         """Summarize a webpage or other content."""
         result = self.generate_structured_output(
@@ -179,7 +280,11 @@ class LLMUtil:
             return result
 
     def translate_text(
-        self, text: str, target_language: str, prompt_template: str, max_chunk_size: int = 2000
+        self,
+        text: str,
+        target_language: str,
+        prompt_template: str,
+        max_chunk_size: int = 2000,
     ) -> str:
         """Translate the given text into the target language using the provided language prompt."""
         if not prompt_template:
@@ -197,8 +302,10 @@ class LLMUtil:
                 translated_chunks.append(translated_chunk)
             except Exception as e:
                 self.logger.error(f"Translation failed for a chunk: {e}")
-                translated_chunks.append(chunk)  # Append the original chunk if translation fails
+                translated_chunks.append(
+                    chunk
+                )  # Append the original chunk if translation fails
 
-        # Recombine the translated chunks
-        translated_text = '\n'.join(translated_chunks)
+        # Recombine the translated chunks with double newlines to preserve markdown structure
+        translated_text = "\n\n".join(translated_chunks)
         return translated_text

@@ -6,7 +6,7 @@ export default function RefreshButton() {
   const [copied, setCopied] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
 
-  const command = 'cd ~/Documents/GitHub/signal-summarizer && ./auto-summarize.sh'
+  const command = 'cd ~/dev/signal-summarizer && ./auto-summarize.sh'
 
   const handleClick = async () => {
     try {

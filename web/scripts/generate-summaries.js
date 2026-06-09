@@ -54,6 +54,10 @@ const ALLOWED_GROUPS = {
     summaryFile: 'summary_ai_feytopia.md',
     displayName: 'AI x FEYTOPIA'
   },
+  'aixfeytopia': {
+    summaryFile: 'summary_ai_feytopia.md',
+    displayName: 'AI x FEYTOPIA'
+  },
   'paraguaj on-site in asuncion': {
     summaryFile: 'summary_paraguaj_onsite.md',
     displayName: 'Paraguaj on-site in Asuncion'
@@ -75,6 +79,10 @@ const ALLOWED_GROUPS = {
     summaryFile: 'summary_liberation_travel.md',
     displayName: 'Liberation Travel Announcements'
   },
+  'aiczsk': {
+    summaryFile: 'summary_ai_czsk.md',
+    displayName: 'AI CZSK'
+  },
 }
 
 // Get all groups with message counts - only include explicitly allowed groups
@@ -95,8 +103,8 @@ const allGroups = db.prepare(`
   return g.id in ALLOWED_GROUPS || nameLower in ALLOWED_GROUPS
 })
 
-// Deduplicate groups: prefer live collector groups over imported ones
-// When multiple groups have the same display name, keep only the most recent one
+// Deduplicate groups: prefer the one with more messages (imported usually has more complete data)
+// When multiple groups have the same display name, keep the one with the most messages
 const groupsByName = new Map()
 allGroups.forEach(g => {
   const nameLower = (g.name || '').toLowerCase()
@@ -107,17 +115,12 @@ allGroups.forEach(g => {
   if (!existing) {
     groupsByName.set(displayName, g)
   } else {
-    // Prefer non-imported groups (live collector data)
-    const existingIsImported = existing.id.startsWith('imported_')
-    const currentIsImported = g.id.startsWith('imported_')
-
-    if (existingIsImported && !currentIsImported) {
-      // Replace imported with live
-      console.log(`Preferring live group "${g.name}" over imported "${existing.name}"`)
+    // Prefer the group with more messages (more complete data)
+    if (g.messageCount > existing.messageCount) {
+      console.log(`Preferring "${g.name}" (${g.messageCount} msgs) over "${existing.name}" (${existing.messageCount} msgs)`)
       groupsByName.set(displayName, g)
-    } else if (!existingIsImported && currentIsImported) {
-      // Keep live, skip imported
-      console.log(`Skipping imported group "${g.name}" (live version exists: "${existing.name}")`)
+    } else if (g.messageCount < existing.messageCount) {
+      console.log(`Keeping "${existing.name}" (${existing.messageCount} msgs) over "${g.name}" (${g.messageCount} msgs)`)
     } else if (g.lastTimestamp > existing.lastTimestamp) {
       // Same type, prefer more recent
       console.log(`Preferring more recent group "${g.name}" over "${existing.name}"`)
@@ -325,6 +328,110 @@ fs.writeFileSync(
 )
 
 console.log(`Generated topic index for ${Object.keys(topicIndex).length} groups`)
+
+// Generate links index — extract all links from summaries, filter broken ones, categorize
+const linksIndex = []
+const seenUrls = new Set()
+
+formattedGroups.forEach(group => {
+  const summaryPath = path.join(SUMMARIES_DIR, `${group.id}.md`)
+  if (!fs.existsSync(summaryPath)) return
+
+  const content = fs.readFileSync(summaryPath, 'utf8')
+
+  // Extract markdown links: [title](url): description
+  // The summaries have format: - [Title](url): Description
+  const linkRegex = /^-\s+\[([^\]]+)\]\(([^)]+)\):\s*(.+)$/gm
+  let match
+  while ((match = linkRegex.exec(content)) !== null) {
+    const [, title, url, description] = match
+
+    // Skip broken/empty links
+    if (description.includes('Empty webpage content') ||
+        description.includes('Failed to fetch') ||
+        description.includes('403 Forbidden') ||
+        description.includes('corrupted') ||
+        description.includes('ASCII art') ||
+        description.startsWith('(')) continue
+
+    // Skip Signal group links
+    if (url.includes('signal.group/')) continue
+
+    // Skip duplicates
+    if (seenUrls.has(url)) continue
+    seenUrls.add(url)
+
+    // Categorize
+    let category = 'Article'
+    if (url.includes('github.com')) category = 'Repo'
+    else if (url.includes('huggingface.co')) category = 'Model'
+    else if (url.includes('arxiv.org') || url.includes('transformer-circuits') || url.includes('research')) category = 'Research'
+    else if (url.includes('youtube.com') || url.includes('youtu.be')) category = 'Video'
+    else if (url.includes('cloudflare.com') || url.includes('duck.ai') || url.includes('proton.me')) category = 'Tool'
+
+    linksIndex.push({
+      title: title.trim(),
+      url: url.trim(),
+      description: description.trim().slice(0, 200),
+      groupId: group.id,
+      groupName: group.name,
+      category,
+      lastTimestamp: group.lastTimestamp
+    })
+  }
+})
+
+fs.writeFileSync(
+  path.join(OUTPUT_DIR, 'links-index.json'),
+  JSON.stringify(linksIndex, null, 2)
+)
+console.log(`Generated links index with ${linksIndex.length} curated links`)
+
+// Generate highlights feed — extract themes from all summaries
+const highlightsFeed = []
+
+formattedGroups.forEach(group => {
+  const summaryPath = path.join(SUMMARIES_DIR, `${group.id}.md`)
+  if (!fs.existsSync(summaryPath)) return
+
+  const content = fs.readFileSync(summaryPath, 'utf8')
+
+  // Split by ## **Title** sections
+  const sections = content.split(/^## \*\*/gm).filter(s => s.trim())
+
+  sections.forEach(section => {
+    const lines = section.split('\n')
+    const title = lines[0].replace(/\*\*/g, '').trim()
+
+    // Skip the "Links shared with the group" section
+    if (title.toLowerCase().includes('links shared')) return
+
+    // Get the content (skip title line)
+    const body = lines.slice(1).join('\n').trim()
+    if (!body) return
+
+    // Get first 200 chars as excerpt
+    const excerpt = body.replace(/\*\*Dissenting opinions:\*\*.*/s, '').trim().slice(0, 200)
+
+    highlightsFeed.push({
+      theme: title,
+      excerpt: excerpt + (excerpt.length >= 200 ? '...' : ''),
+      groupId: group.id,
+      groupName: group.name,
+      lastTimestamp: group.lastTimestamp,
+      lastUpdated: group.lastUpdated
+    })
+  })
+})
+
+// Sort by recency
+highlightsFeed.sort((a, b) => b.lastTimestamp - a.lastTimestamp)
+
+fs.writeFileSync(
+  path.join(OUTPUT_DIR, 'highlights-feed.json'),
+  JSON.stringify(highlightsFeed, null, 2)
+)
+console.log(`Generated highlights feed with ${highlightsFeed.length} themes`)
 
 console.log(`Generated data for ${formattedGroups.length} groups`)
 console.log(`Generated search index with ${searchIndex.length} sections`)

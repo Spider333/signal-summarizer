@@ -1,9 +1,56 @@
+# Sensitive files - NEVER COMMIT
+.env
+.env.*
+.env.local
 config.json
+config-*.json
+*.db
 messages.db
+
+# API keys and secrets
+secrets/
+*.pem
+*.key
+
+# Generated files
 poetry.lock
+.venv/
 summary*.md
+sync-messages.sh
+config-optionplus-venice-e2ee.json.orig
 outputs/*
 run.sh
 run*.sh
-config-*.json
 resume.json
+cron.log
+cron-error.log
+*.log
+
+# Signal data exports & attachments - NEVER COMMIT (private message content, multi-GB)
+signal-export/
+signal-export-new/
+signal-export-requested/
+attachments/
+signal-cli-readonly/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

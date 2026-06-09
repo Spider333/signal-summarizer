@@ -3,6 +3,11 @@
 import argparse
 import sys
 import sqlite3
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 from group_summarizer import (
     setup_logging,
     load_config,

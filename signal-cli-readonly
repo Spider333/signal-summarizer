@@ -1,0 +1,17 @@
+#!/bin/bash
+# Read-only wrapper for signal-cli
+# This script blocks any commands that could send messages or modify data
+
+BLOCKED_COMMANDS="send sendReaction sendReceipt sendTyping sendContacts sendSyncRequest sendPaymentNotification updateProfile updateGroup updateContact joinGroup quitGroup block unblock setPin removePin trust remoteDelete"
+
+for cmd in $BLOCKED_COMMANDS; do
+    for arg in "$@"; do
+        if [[ "$arg" == "$cmd" ]]; then
+            echo "ERROR: Command '$cmd' is blocked in read-only mode" >&2
+            exit 1
+        fi
+    done
+done
+
+# Pass through to real signal-cli
+exec /opt/homebrew/bin/signal-cli "$@"
