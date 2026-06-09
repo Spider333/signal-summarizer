@@ -102,8 +102,10 @@ summarize_group "LLC" "summary_llc.md" "LLC"
 summarize_group "SOLO BoG" "summary_solo_bog.md" "Solo BoG"
 summarize_group "LiberationTravel" "summary_liberation_travel.md" "Liberation Travel"
 summarize_group "AI x FEYTOPIA" "summary_ai_feytopia.md" "AI x FEYTOPIA"
-summarize_group "XAPOCZ" "summary_xapocz_sk.md" "XAPOCZ/SK komunita"
+summarize_group "Xapo" "summary_xapocz_sk.md" "Xapo CZ/SK Komunita"
 summarize_group "Bordel" "summary_bordel_hackerspace.md" "Bordel | Hackerspace"
+summarize_group "AI CZSK" "summary_ai_czsk.md" "AI CZSK"
+summarize_group "Hermes" "summary_hermes_claws.md" "Hermes / Claws CZ/SK"
 
 echo ""
 
