@@ -4,7 +4,7 @@
 # Used by launchd daemon — KeepAlive restarts on exit.
 #
 
-cd /Users/davidstancel/Documents/GitHub/signal-message-processor || exit 1
+cd /Users/davidstancel/dev/signal-message-processor || exit 1
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export HOME="/Users/davidstancel"

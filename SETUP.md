@@ -4,7 +4,7 @@ This document contains everything you need to know about your automated Signal g
 
 **Website:** https://signal-summaries.vercel.app
 **Vercel Project:** stanceldavid/signal-summaries
-**GitHub Repo:** /Users/davidstancel/Documents/GitHub/signal-summarizer
+**GitHub Repo:** /Users/davidstancel/dev/signal-summarizer
 
 ---
 
@@ -155,7 +155,7 @@ The website at https://signal-summaries.vercel.app includes several features to 
 
 The system uses a **read-only wrapper** that blocks all send operations:
 
-**File:** `/Users/davidstancel/Documents/GitHub/signal-summarizer/signal-cli-readonly`
+**File:** `/Users/davidstancel/dev/signal-summarizer/signal-cli-readonly`
 
 ```bash
 # Blocked commands (cannot send anything):
@@ -181,7 +181,7 @@ unblock, setPin, removePin, trust, remoteDelete
 
 | Secret | Location | Notes |
 |--------|----------|-------|
-| ANTHROPIC_API_KEY | `/Users/davidstancel/Documents/GitHub/signal-summarizer/.env` | Not in git |
+| ANTHROPIC_API_KEY | `/Users/davidstancel/dev/signal-summarizer/.env` | Not in git |
 | Vercel Token | `~/.config/vercel/auth.json` | Managed by Vercel CLI |
 | Signal credentials | `~/.local/share/signal-cli/` | Managed by signal-cli |
 
@@ -212,14 +212,14 @@ View with: `crontab -l`
 
 ```cron
 # Signal group summarizer - runs every hour
-0 * * * * /Users/davidstancel/Documents/GitHub/signal-summarizer/auto-summarize.sh >> /Users/davidstancel/Documents/GitHub/signal-summarizer/cron.log 2>&1
+0 * * * * /Users/davidstancel/dev/signal-summarizer/auto-summarize.sh >> /Users/davidstancel/dev/signal-summarizer/cron.log 2>&1
 ```
 
 ### What This Means
 
 - **Schedule:** `0 * * * *` = Every hour at minute :00 (1:00, 2:00, 3:00, etc.)
-- **Script:** `/Users/davidstancel/Documents/GitHub/signal-summarizer/auto-summarize.sh`
-- **Output:** Appended to `/Users/davidstancel/Documents/GitHub/signal-summarizer/cron.log`
+- **Script:** `/Users/davidstancel/dev/signal-summarizer/auto-summarize.sh`
+- **Output:** Appended to `/Users/davidstancel/dev/signal-summarizer/cron.log`
 
 ### What the Cron Job Does (Step by Step)
 
@@ -265,7 +265,7 @@ Common schedules:
 
 The cron job runs this automatically:
 ```bash
-cd /Users/davidstancel/Documents/GitHub/signal-summarizer/web
+cd /Users/davidstancel/dev/signal-summarizer/web
 npm run generate    # Creates data/groups.json and data/summaries/*.md
 vercel --prod --yes # Deploys to production
 ```
@@ -273,7 +273,7 @@ vercel --prod --yes # Deploys to production
 ### Manual Deployment
 
 ```bash
-cd /Users/davidstancel/Documents/GitHub/signal-summarizer/web
+cd /Users/davidstancel/dev/signal-summarizer/web
 npm run generate
 vercel --prod --yes
 ```
@@ -400,7 +400,7 @@ Then regenerate: `cd web && npm run generate`
 ## Directory Structure
 
 ```
-/Users/davidstancel/Documents/GitHub/signal-summarizer/
+/Users/davidstancel/dev/signal-summarizer/
 │
 ├── SETUP.md                    # THIS FILE - complete documentation
 ├── README.md                   # Original project readme
@@ -456,20 +456,20 @@ Then regenerate: `cd web && npm run generate`
 ps aux | grep signal_message_processor | grep -v grep
 
 # Start collector
-cd /Users/davidstancel/Documents/GitHub/signal-summarizer
+cd /Users/davidstancel/dev/signal-summarizer
 ./start-collector-bg.sh
 
 # Stop collector
-kill $(cat /Users/davidstancel/Documents/GitHub/signal-summarizer/collector.pid)
+kill $(cat /Users/davidstancel/dev/signal-summarizer/collector.pid)
 
 # View collector logs
-tail -f /Users/davidstancel/Documents/GitHub/signal-summarizer/collector.log
+tail -f /Users/davidstancel/dev/signal-summarizer/collector.log
 ```
 
 ### Summarizer
 
 ```bash
-cd /Users/davidstancel/Documents/GitHub/signal-summarizer
+cd /Users/davidstancel/dev/signal-summarizer
 
 # Run full automation (default: last 3 days)
 ./auto-summarize.sh
@@ -490,7 +490,7 @@ sqlite3 messages.db "SELECT groupName, COUNT(*) FROM messages WHERE groupId IS N
 ### Website
 
 ```bash
-cd /Users/davidstancel/Documents/GitHub/signal-summarizer/web
+cd /Users/davidstancel/dev/signal-summarizer/web
 
 # Regenerate data
 npm run generate
@@ -518,21 +518,21 @@ signal-cli -a +421911738272 receive
 
 | Log File | Location | Purpose |
 |----------|----------|---------|
-| collector.log | `/Users/davidstancel/Documents/GitHub/signal-summarizer/collector.log` | Messages received by collector |
-| cron.log | `/Users/davidstancel/Documents/GitHub/signal-summarizer/cron.log` | Hourly job output |
-| collector-error.log | `/Users/davidstancel/Documents/GitHub/signal-summarizer/collector-error.log` | Collector errors |
+| collector.log | `/Users/davidstancel/dev/signal-summarizer/collector.log` | Messages received by collector |
+| cron.log | `/Users/davidstancel/dev/signal-summarizer/cron.log` | Hourly job output |
+| collector-error.log | `/Users/davidstancel/dev/signal-summarizer/collector-error.log` | Collector errors |
 
 ### View Logs
 
 ```bash
 # Recent collector activity
-tail -50 /Users/davidstancel/Documents/GitHub/signal-summarizer/collector.log
+tail -50 /Users/davidstancel/dev/signal-summarizer/collector.log
 
 # Recent cron runs
-tail -100 /Users/davidstancel/Documents/GitHub/signal-summarizer/cron.log
+tail -100 /Users/davidstancel/dev/signal-summarizer/cron.log
 
 # Follow collector in real-time
-tail -f /Users/davidstancel/Documents/GitHub/signal-summarizer/collector.log
+tail -f /Users/davidstancel/dev/signal-summarizer/collector.log
 ```
 
 ---
@@ -570,20 +570,20 @@ Controls which groups appear on website via `ALLOWED_GROUPS` object.
 
 2. Check messages exist:
    ```bash
-   sqlite3 /Users/davidstancel/Documents/GitHub/signal-summarizer/messages.db \
+   sqlite3 /Users/davidstancel/dev/signal-summarizer/messages.db \
      "SELECT COUNT(*) FROM messages;"
    ```
 
 3. Check cron log:
    ```bash
-   tail -50 /Users/davidstancel/Documents/GitHub/signal-summarizer/cron.log
+   tail -50 /Users/davidstancel/dev/signal-summarizer/cron.log
    ```
 
 ### Collector not starting
 
 1. Check error log:
    ```bash
-   cat /Users/davidstancel/Documents/GitHub/signal-summarizer/collector-error.log
+   cat /Users/davidstancel/dev/signal-summarizer/collector-error.log
    ```
 
 2. Start manually:
@@ -618,7 +618,7 @@ The collector only captures messages received **while it's running**. Historical
 
 Check your Anthropic API key:
 ```bash
-cat /Users/davidstancel/Documents/GitHub/signal-summarizer/.env
+cat /Users/davidstancel/dev/signal-summarizer/.env
 ```
 
 Test API access:
